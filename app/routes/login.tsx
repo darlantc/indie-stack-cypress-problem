@@ -1,28 +1,29 @@
 import type { ActionArgs, LoaderArgs, MetaFunction } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { Form, Link, useActionData, useSearchParams } from "@remix-run/react";
 import * as React from "react";
+import APP_ROUTES from "~/utils/appRoutes";
 
-import { createUserSession, getUserId } from "~/session.server";
-import { verifyLogin } from "~/models/user.server";
-import { safeRedirect, validateEmail } from "~/utils";
+import { createUserSession } from "~/server/session.server";
+import { verifyLogin } from "~/server/user.server";
+import { safeRedirect, validateEmail } from "~/utils/utils";
+
+import { redirectToAppIfLoggedIn } from "~/middleware/redirects";
 
 export async function loader({ request }: LoaderArgs) {
-  const userId = await getUserId(request);
-  if (userId) return redirect("/");
-  return json({});
+  return redirectToAppIfLoggedIn(request);
 }
 
 export async function action({ request }: ActionArgs) {
   const formData = await request.formData();
   const email = formData.get("email");
   const password = formData.get("password");
-  const redirectTo = safeRedirect(formData.get("redirectTo"), "/notes");
+  const redirectTo = safeRedirect(formData.get("redirectTo"), APP_ROUTES.home);
   const remember = formData.get("remember");
 
   if (!validateEmail(email)) {
     return json(
-      { errors: { email: "Email is invalid", password: null } },
+      { errors: { email: "Email is required", password: null } },
       { status: 400 }
     );
   }
@@ -45,7 +46,9 @@ export async function action({ request }: ActionArgs) {
 
   if (!user) {
     return json(
-      { errors: { email: "Invalid email or password", password: null } },
+      {
+        errors: { email: "Your email or password are invalid", password: null },
+      },
       { status: 400 }
     );
   }
@@ -53,20 +56,20 @@ export async function action({ request }: ActionArgs) {
   return createUserSession({
     request,
     userId: user.id,
-    remember: remember === "on" ? true : false,
+    remember: remember === "on",
     redirectTo,
   });
 }
 
 export const meta: MetaFunction = () => {
   return {
-    title: "Login",
+    title: "Entre na sua conta",
   };
 };
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") || "/notes";
+  const redirectTo = searchParams.get("redirectTo") || APP_ROUTES.home;
   const actionData = useActionData<typeof action>();
   const emailRef = React.useRef<HTMLInputElement>(null);
   const passwordRef = React.useRef<HTMLInputElement>(null);
@@ -88,7 +91,7 @@ export default function LoginPage() {
               htmlFor="email"
               className="block text-sm font-medium text-gray-700"
             >
-              Email address
+              Your email
             </label>
             <div className="mt-1">
               <input
@@ -116,7 +119,7 @@ export default function LoginPage() {
               htmlFor="password"
               className="block text-sm font-medium text-gray-700"
             >
-              Password
+              Your password
             </label>
             <div className="mt-1">
               <input
@@ -142,7 +145,7 @@ export default function LoginPage() {
             type="submit"
             className="w-full rounded bg-blue-500  py-2 px-4 text-white hover:bg-blue-600 focus:bg-blue-400"
           >
-            Log in
+            Login
           </button>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -156,7 +159,7 @@ export default function LoginPage() {
                 htmlFor="remember"
                 className="ml-2 block text-sm text-gray-900"
               >
-                Remember me
+                Remember
               </label>
             </div>
             <div className="text-center text-sm text-gray-500">
@@ -164,11 +167,11 @@ export default function LoginPage() {
               <Link
                 className="text-blue-500 underline"
                 to={{
-                  pathname: "/join",
+                  pathname: APP_ROUTES.join,
                   search: searchParams.toString(),
                 }}
               >
-                Sign up
+                Register
               </Link>
             </div>
           </div>
